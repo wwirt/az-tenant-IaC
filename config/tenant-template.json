@@ -1,0 +1,64 @@
+{
+  "tenant": {
+    "display_name": "Contoso Tenant",
+    "domain_name": "contoso.onmicrosoft.com"
+  },
+  "management_groups": [
+    {
+      "name": "mg-root",
+      "display_name": "Root Management Group",
+      "parent_id": null
+    },
+    {
+      "name": "mg-platform",
+      "display_name": "Platform",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-landing-zones",
+      "display_name": "Landing Zones",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-identity",
+      "display_name": "Identity",
+      "parent_id": "mg-platform"
+    },
+    {
+      "name": "mg-connectivity",
+      "display_name": "Connectivity",
+      "parent_id": "mg-platform"
+    },
+    {
+      "name": "mg-management",
+      "display_name": "Management",
+      "parent_id": "mg-platform"
+    }
+  ],
+  "subscriptions": [
+    {
+      "name": "Platform Services",
+      "alias": "platform-services",
+      "management_group_id": "mg-platform",
+      "workload": "Production"
+    },
+    {
+      "name": "Application Workloads",
+      "alias": "app-workloads",
+      "management_group_id": "mg-landing-zones",
+      "workload": "Production"
+    },
+    {
+      "name": "Identity Management",
+      "alias": "identity-mgmt",
+      "management_group_id": "mg-identity",
+      "workload": "Production"
+    },
+    {
+      "name": "Connectivity Hub",
+      "alias": "connectivity-hub",
+      "management_group_id": "mg-connectivity",
+      "workload": "Production" 
+    }
+  ]
+}

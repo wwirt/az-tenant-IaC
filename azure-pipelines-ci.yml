@@ -1,0 +1,87 @@
+# Azure DevOps CI Pipeline for Azure Tenant Vending Platform
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - config/*
+      - terraform/*
+      - azure-pipelines-ci.yml
+
+variables:
+  terraformVersion: '1.5.0'
+  backendServiceConnection: 'terraform-backend-connection'
+  tenantServiceConnection: 'tenant-management-connection'
+  backendResourceGroup: 'terraform-state-rg'
+  backendStorageAccount: 'terraformstatestore001'
+  workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+  configDirectory: '$(System.DefaultWorkingDirectory)/config'
+
+stages:
+- stage: Validate
+  displayName: 'Validate Configuration'
+  jobs:
+  - job: ValidateConfig
+    displayName: 'Validate JSON Config Files'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: PowerShell@2
+      displayName: 'Validate JSON Configuration Files'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "Validating JSON configuration files..."
+          $configFiles = Get-ChildItem -Path "$(configDirectory)" -Filter "*.json" -Recurse
+          foreach ($file in $configFiles) {
+              Write-Host "Validating $($file.FullName)"
+              try {
+                  $content = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                  Write-Host "✓ $($file.Name) is valid JSON"
+              }
+              catch {
+                  Write-Error "✗ $($file.Name) contains invalid JSON: $($_.Exception.Message)"
+                  exit 1
+              }
+          }
+          Write-Host "All JSON files are valid"
+
+  - job: TerraformValidate
+    displayName: 'Terraform Validate & Plan'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: TerraformInstaller@0
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: $(terraformVersion)
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: $(workingDirectory)
+        backendServiceArm: $(backendServiceConnection)
+        backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+        backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'tenant.tfstate'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Validate'
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: $(workingDirectory)
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: $(workingDirectory)
+        environmentServiceNameAzureRM: $(tenantServiceConnection)
+        commandOptions: '-var-file="../config/tenant-config.json" -out=tfplan'

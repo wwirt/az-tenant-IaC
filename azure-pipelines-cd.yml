@@ -1,12 +1,28 @@
-# Azure DevOps CI/CD Pipeline for Azure Tenant Infrastructure
-trigger:
-  branches:
-    include:
-    - main
-    - develop
-# ...existing code...
+# Azure DevOps CD Pipeline for Azure Tenant Vending Platform
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: ciPipeline
+      source: azure-pipelines-ci
+      trigger:
+        branches:
+          include:
+            - main
+            - develop
+
+variables:
+  terraformVersion: '1.5.0'
+  backendServiceConnection: 'terraform-backend-connection'
+  tenantServiceConnection: 'tenant-management-connection'
+  backendResourceGroup: 'terraform-state-rg'
+  backendStorageAccount: 'terraformstatestore001'
+  workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+  configDirectory: '$(System.DefaultWorkingDirectory)/config'
+
+stages:
+- stage: Deploy_Dev
   displayName: 'Deploy to Development'
-  dependsOn: Validate
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
   jobs:
   - deployment: DeployDev
@@ -19,12 +35,10 @@ trigger:
         deploy:
           steps:
           - checkout: self
-          
           - task: TerraformInstaller@0
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: $(terraformVersion)
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Init'
             inputs:
@@ -36,7 +50,6 @@ trigger:
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: 'tfstate'
               backendAzureRmKey: 'tenant-dev.tfstate'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Apply'
             inputs:
@@ -48,8 +61,6 @@ trigger:
 
 - stage: Deploy_Prod
   displayName: 'Deploy to Production'
-  dependsOn: Validate
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
   - deployment: DeployProd
     displayName: 'Deploy Production Environment'
@@ -61,12 +72,10 @@ trigger:
         deploy:
           steps:
           - checkout: self
-          
           - task: TerraformInstaller@0
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: $(terraformVersion)
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Init'
             inputs:
@@ -78,7 +87,6 @@ trigger:
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: 'tfstate'
               backendAzureRmKey: 'tenant-prod.tfstate'
-
           - task: TerraformTaskV4@4
             displayName: 'Terraform Apply'
             inputs:

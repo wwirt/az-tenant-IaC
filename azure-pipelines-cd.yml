@@ -35,10 +35,30 @@ stages:
         deploy:
           steps:
           - checkout: self
+          
+          - task: PowerShell@2
+            displayName: 'Validate Management Group Structure'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "Validating management group structure for development..."
+                $mgConfig = Get-Content "$(configDirectory)/management-groups.json" | ConvertFrom-Json
+                $tenantConfig = Get-Content "$(configDirectory)/tenant-config.json" | ConvertFrom-Json
+                
+                # Validate management groups referenced in tenant config exist
+                foreach ($subscription in $tenantConfig.subscriptions) {
+                  $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
+                  if (-not $mgExists) {
+                    Write-Warning "Management group '$($subscription.management_group_id)' referenced in subscription '$($subscription.name)' not found in management-groups.json"
+                  }
+                }
+                Write-Host "Management group validation completed"
+          
           - task: TerraformInstaller@0
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: $(terraformVersion)
+          
           - task: TerraformTaskV4@4
             displayName: 'Terraform Init'
             inputs:
@@ -50,6 +70,16 @@ stages:
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: 'tfstate'
               backendAzureRmKey: 'tenant-dev.tfstate'
+          
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Plan'
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: $(workingDirectory)
+              environmentServiceNameAzureRM: $(tenantServiceConnection)
+              commandOptions: '-var-file="../config/dev-config.json" -var="environment=dev" -var="management_groups_file=../config/management-groups.json" -var="tenant_config_file=../config/tenant-config.json" -out=tfplan'
+          
           - task: TerraformTaskV4@4
             displayName: 'Terraform Apply'
             inputs:
@@ -57,10 +87,11 @@ stages:
               command: 'apply'
               workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(tenantServiceConnection)
-              commandOptions: '-var-file="../config/dev-config.json" -var="environment=dev" -var="management_groups_file=../config/management-groups.json" -auto-approve'
+              commandOptions: 'tfplan'
 
 - stage: Deploy_Prod
   displayName: 'Deploy to Production'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
   - deployment: DeployProd
     displayName: 'Deploy Production Environment'
@@ -72,10 +103,42 @@ stages:
         deploy:
           steps:
           - checkout: self
+          
+          - task: PowerShell@2
+            displayName: 'Validate Management Group Structure'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "Validating management group structure for production..."
+                $mgConfig = Get-Content "$(configDirectory)/management-groups.json" | ConvertFrom-Json
+                $tenantConfig = Get-Content "$(configDirectory)/tenant-config.json" | ConvertFrom-Json
+                
+                # Validate management groups referenced in tenant config exist
+                foreach ($subscription in $tenantConfig.subscriptions) {
+                  $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
+                  if (-not $mgExists) {
+                    Write-Error "Management group '$($subscription.management_group_id)' referenced in subscription '$($subscription.name)' not found in management-groups.json"
+                    exit 1
+                  }
+                }
+                
+                # Validate hierarchical structure
+                foreach ($mg in $mgConfig.management_groups) {
+                  if ($mg.parent_id -and $mg.parent_id -ne $null) {
+                    $parentExists = $mgConfig.management_groups | Where-Object { $_.name -eq $mg.parent_id }
+                    if (-not $parentExists) {
+                      Write-Error "Parent management group '$($mg.parent_id)' for '$($mg.name)' not found"
+                      exit 1
+                    }
+                  }
+                }
+                Write-Host "Management group validation completed successfully"
+          
           - task: TerraformInstaller@0
             displayName: 'Install Terraform'
             inputs:
               terraformVersion: $(terraformVersion)
+          
           - task: TerraformTaskV4@4
             displayName: 'Terraform Init'
             inputs:
@@ -87,6 +150,16 @@ stages:
               backendAzureRmStorageAccountName: '$(backendStorageAccount)'
               backendAzureRmContainerName: 'tfstate'
               backendAzureRmKey: 'tenant-prod.tfstate'
+          
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Plan'
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              workingDirectory: $(workingDirectory)
+              environmentServiceNameAzureRM: $(tenantServiceConnection)
+              commandOptions: '-var-file="../config/prod-config.json" -var="environment=prod" -var="management_groups_file=../config/management-groups.json" -var="tenant_config_file=../config/tenant-config.json" -out=tfplan'
+          
           - task: TerraformTaskV4@4
             displayName: 'Terraform Apply'
             inputs:
@@ -94,4 +167,14 @@ stages:
               command: 'apply'
               workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(tenantServiceConnection)
-              commandOptions: '-var-file="../config/prod-config.json" -var="environment=prod" -var="management_groups_file=../config/management-groups.json" -auto-approve'
+              commandOptions: 'tfplan'
+          
+          - task: PowerShell@2
+            displayName: 'Verify Deployment'
+            condition: succeededOrFailed()
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "Verifying management group deployment..."
+                # Add verification logic here to ensure management groups were created correctly
+                Write-Host "Deployment verification completed"

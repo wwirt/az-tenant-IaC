@@ -8,6 +8,36 @@
       "name": "mg-root",
       "display_name": "Root Management Group",
       "parent_id": null
+    },
+    {
+      "name": "mg-platform",
+      "display_name": "Platform Management Group",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-workloads",
+      "display_name": "Workloads Management Group",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-platform-dev",
+      "display_name": "Platform Development",
+      "parent_id": "mg-platform"
+    },
+    {
+      "name": "mg-platform-prod",
+      "display_name": "Platform Production",
+      "parent_id": "mg-platform"
+    },
+    {
+      "name": "mg-workloads-dev",
+      "display_name": "Workloads Development",
+      "parent_id": "mg-workloads"
+    },
+    {
+      "name": "mg-workloads-prod",
+      "display_name": "Workloads Production",
+      "parent_id": "mg-workloads"
     }
   ]
 }

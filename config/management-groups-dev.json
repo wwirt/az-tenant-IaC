@@ -1,0 +1,14 @@
+{
+  "management_groups": [
+    {
+      "name": "mg-platform-dev",
+      "display_name": "Platform - Development",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-workloads-dev",
+      "display_name": "Workloads - Development",
+      "parent_id": "mg-root"
+    }
+  ]
+}

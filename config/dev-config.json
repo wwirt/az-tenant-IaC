@@ -3,23 +3,6 @@
     "display_name": "Contoso Development Tenant",
     "domain_name": "contoso-dev.onmicrosoft.com"
   },
-  "management_groups": [
-    {
-      "name": "mg-platform-dev",
-      "display_name": "Platform - Development",
-      "parent_id": null
-    },
-    {
-      "name": "mg-workloads-dev",
-      "display_name": "Workloads - Development",
-      "parent_id": "mg-platform-dev"
-    },
-    {
-      "name": "mg-sandbox-dev",
-      "display_name": "Sandbox - Development",
-      "parent_id": "mg-platform-dev"
-    }
-  ],
   "subscriptions": [
     {
       "name": "Platform Services - Development",
@@ -31,12 +14,6 @@
       "name": "Application Workloads - Development",
       "alias": "app-workloads-dev",
       "management_group_id": "mg-workloads-dev",
-      "workload": "DevTest"
-    },
-    {
-      "name": "Developer Sandbox - Development",
-      "alias": "dev-sandbox-dev",
-      "management_group_id": "mg-sandbox-dev",
       "workload": "DevTest"
     }
   ]

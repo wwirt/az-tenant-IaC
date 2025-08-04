@@ -3,34 +3,17 @@
     "display_name": "Contoso Tenant",
     "domain_name": "contoso.onmicrosoft.com"
   },
-  "management_groups": [
-    {
-      "name": "mg-root",
-      "display_name": "Root Management Group",
-      "parent_id": null
-    },
-    {
-      "name": "mg-platform",
-      "display_name": "Platform",
-      "parent_id": "mg-root"
-    },
-    {
-      "name": "mg-landing-zones",
-      "display_name": "Landing Zones",
-      "parent_id": "mg-root"
-    }
-  ],
   "subscriptions": [
     {
       "name": "Platform Services",
       "alias": "platform-services",
-      "management_group_id": "mg-platform",
-      "workload": "Production"
+      "management_group_id": "mg-platform-dev",
+      "workload": "Development"
     },
     {
       "name": "Application Workloads",
       "alias": "app-workloads",
-      "management_group_id": "mg-landing-zones",
+      "management_group_id": "mg-workloads-prod",
       "workload": "Production"
     }
   ]

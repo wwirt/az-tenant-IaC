@@ -84,4 +84,4 @@ stages:
         command: 'plan'
         workingDirectory: $(workingDirectory)
         environmentServiceNameAzureRM: $(tenantServiceConnection)
-        commandOptions: '-var-file="../config/tenant-config.json" -out=tfplan'
+        commandOptions: '-var-file="../config/prod-config.json" -var="environment=prod" -var="management_groups_file=../config/management-groups.json" -out=tfplan'

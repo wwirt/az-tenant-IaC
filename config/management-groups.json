@@ -1,0 +1,13 @@
+{
+  "tenant": {
+    "display_name": "Contoso Enterprise",
+    "domain_name": "contoso.onmicrosoft.com"
+  },
+  "management_groups": [
+    {
+      "name": "mg-root",
+      "display_name": "Root Management Group",
+      "parent_id": null
+    }
+  ]
+}

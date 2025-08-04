@@ -57,7 +57,7 @@ stages:
               command: 'apply'
               workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(tenantServiceConnection)
-              commandOptions: '-var-file="../config/dev-config.json" -auto-approve'
+              commandOptions: '-var-file="../config/dev-config.json" -var="environment=dev" -var="management_groups_file=../config/management-groups.json" -auto-approve'
 
 - stage: Deploy_Prod
   displayName: 'Deploy to Production'
@@ -94,4 +94,4 @@ stages:
               command: 'apply'
               workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(tenantServiceConnection)
-              commandOptions: '-var-file="../config/prod-config.json" -auto-approve'
+              commandOptions: '-var-file="../config/prod-config.json" -var="environment=prod" -var="management_groups_file=../config/management-groups.json" -auto-approve'

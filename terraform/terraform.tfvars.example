@@ -1,0 +1,21 @@
+# Example Terraform variables file
+# Copy this to terraform.tfvars and customize for your environment
+
+# Environment name (dev, staging, prod, etc.)
+environment = "dev"
+
+# Azure region for resources
+location = "East US"
+
+# Path to JSON configuration file (relative to terraform directory)
+config_file_path = "../config/dev-config.json"
+
+# Common tags for all resources
+tags = {
+  Environment   = "dev"
+  ManagedBy     = "Terraform"
+  Project       = "Azure-Tenant-IaC"
+  CreatedBy     = "Azure-DevOps"
+  Owner         = "Platform-Team"
+  CostCenter    = "IT-001"
+}

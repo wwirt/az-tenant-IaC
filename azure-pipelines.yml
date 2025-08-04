@@ -1,0 +1,169 @@
+# Azure DevOps CI/CD Pipeline for Azure Tenant Infrastructure
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - config/*
+    - terraform/*
+    - azure-pipelines.yml
+
+variables:
+  terraformVersion: '1.5.0'
+  azureServiceConnection: 'azure-service-connection' # Update with your service connection name
+  workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+  configDirectory: '$(System.DefaultWorkingDirectory)/config'
+
+stages:
+- stage: Validate
+  displayName: 'Validate Configuration'
+  jobs:
+  - job: ValidateConfig
+    displayName: 'Validate JSON Config Files'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: PowerShell@2
+      displayName: 'Validate JSON Configuration Files'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "Validating JSON configuration files..."
+          $configFiles = Get-ChildItem -Path "$(configDirectory)" -Filter "*.json" -Recurse
+          
+          foreach ($file in $configFiles) {
+              Write-Host "Validating $($file.FullName)"
+              try {
+                  $content = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                  Write-Host "✓ $($file.Name) is valid JSON"
+              }
+              catch {
+                  Write-Error "✗ $($file.Name) contains invalid JSON: $($_.Exception.Message)"
+                  exit 1
+              }
+          }
+          Write-Host "All JSON files are valid"
+
+  - job: TerraformValidate
+    displayName: 'Terraform Validate'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: TerraformInstaller@0
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: $(terraformVersion)
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: $(workingDirectory)
+        backendServiceArm: $(azureServiceConnection)
+        backendAzureRmResourceGroupName: 'terraform-state-rg'
+        backendAzureRmStorageAccountName: 'terraformstatestore001' # Update with your storage account
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: 'tenant.tfstate'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Validate'
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+        workingDirectory: $(workingDirectory)
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: $(workingDirectory)
+        environmentServiceNameAzureRM: $(azureServiceConnection)
+        commandOptions: '-var-file="../config/tenant-config.json" -out=tfplan'
+
+- stage: Deploy_Dev
+  displayName: 'Deploy to Development'
+  dependsOn: Validate
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  jobs:
+  - deployment: DeployDev
+    displayName: 'Deploy Development Environment'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          
+          - task: TerraformInstaller@0
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: $(terraformVersion)
+
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: $(workingDirectory)
+              backendServiceArm: $(azureServiceConnection)
+              backendAzureRmResourceGroupName: 'terraform-state-rg'
+              backendAzureRmStorageAccountName: 'terraformstatestore001'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: 'tenant-dev.tfstate'
+
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Apply'
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              workingDirectory: $(workingDirectory)
+              environmentServiceNameAzureRM: $(azureServiceConnection)
+              commandOptions: '-var-file="../config/dev-config.json" -auto-approve'
+
+- stage: Deploy_Prod
+  displayName: 'Deploy to Production'
+  dependsOn: Validate
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployProd
+    displayName: 'Deploy Production Environment'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          
+          - task: TerraformInstaller@0
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: $(terraformVersion)
+
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: $(workingDirectory)
+              backendServiceArm: $(azureServiceConnection)
+              backendAzureRmResourceGroupName: 'terraform-state-rg'
+              backendAzureRmStorageAccountName: 'terraformstatestore001'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: 'tenant-prod.tfstate'
+
+          - task: TerraformTaskV4@4
+            displayName: 'Terraform Apply'
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              workingDirectory: $(workingDirectory)
+              environmentServiceNameAzureRM: $(azureServiceConnection)
+              commandOptions: '-var-file="../config/prod-config.json" -auto-approve'

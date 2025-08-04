@@ -1,0 +1,91 @@
+{
+  "tenant": {
+    "display_name": "Contoso Production Tenant",
+    "domain_name": "contoso.onmicrosoft.com"
+  },
+  "management_groups": [
+    {
+      "name": "mg-root",
+      "display_name": "Root Management Group",
+      "parent_id": null
+    },
+    {
+      "name": "mg-platform",
+      "display_name": "Platform",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-landing-zones",
+      "display_name": "Landing Zones",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-connectivity",
+      "display_name": "Connectivity",
+      "parent_id": "mg-platform"
+    },
+    {
+      "name": "mg-identity",
+      "display_name": "Identity",
+      "parent_id": "mg-platform"
+    },
+    {
+      "name": "mg-management",
+      "display_name": "Management",
+      "parent_id": "mg-platform"
+    },
+    {
+      "name": "mg-corp",
+      "display_name": "Corporate Applications",
+      "parent_id": "mg-landing-zones"
+    },
+    {
+      "name": "mg-online",
+      "display_name": "Online Applications",
+      "parent_id": "mg-landing-zones"
+    },
+    {
+      "name": "mg-sandbox",
+      "display_name": "Sandbox",
+      "parent_id": "mg-root"
+    }
+  ],
+  "subscriptions": [
+    {
+      "name": "Connectivity Hub",
+      "alias": "connectivity-hub-prod",
+      "management_group_id": "mg-connectivity",
+      "workload": "Production"
+    },
+    {
+      "name": "Identity Services",
+      "alias": "identity-services-prod",
+      "management_group_id": "mg-identity",
+      "workload": "Production"
+    },
+    {
+      "name": "Management and Monitoring",
+      "alias": "management-monitoring-prod",
+      "management_group_id": "mg-management",
+      "workload": "Production"
+    },
+    {
+      "name": "Corporate Workloads",
+      "alias": "corp-workloads-prod",
+      "management_group_id": "mg-corp",
+      "workload": "Production"
+    },
+    {
+      "name": "Online Applications",
+      "alias": "online-apps-prod",
+      "management_group_id": "mg-online",
+      "workload": "Production"
+    },
+    {
+      "name": "Developer Sandbox",
+      "alias": "dev-sandbox-prod",
+      "management_group_id": "mg-sandbox",
+      "workload": "DevTest"
+    }
+  ]
+}

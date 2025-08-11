@@ -61,3 +61,9 @@ variable "tags" {
     CostCenter    = "IT-Cloud"
   }
 }
+
+variable "tenant_config_file" {
+  description = "Path to the tenant configuration JSON file"
+  type        = string
+  default     = ""
+}

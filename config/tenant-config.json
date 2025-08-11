@@ -1,20 +1,52 @@
 {
   "tenant": {
     "display_name": "Contoso Tenant",
-    "domain_name": "contoso.onmicrosoft.com"
+    "domain_name": "contoso.onmicrosoft.com",
+    "security_contact": "security@contoso.com"
+  },
+  "security_policies": {
+    "cis_controls": {
+      "require_mfa_for_all_users": true,
+      "block_legacy_authentication": true,
+      "require_managed_devices": true,
+      "disable_password_expiration": false,
+      "minimum_password_length": 14,
+      "block_high_risk_sign_ins": true,
+      "require_terms_of_use": true
+    },
+    "azure_policies": {
+      "allowed_locations": ["West Europe", "North Europe"],
+      "deny_public_storage_accounts": true,
+      "require_https_traffic_only": true,
+      "deny_insecure_tls": true,
+      "require_storage_encryption": true,
+      "audit_unrestricted_network_access": true,
+      "deny_rdp_from_internet": true,
+      "deny_ssh_from_internet": true,
+      "require_nsg_on_subnets": true,
+      "audit_vm_without_backup": true
+    },
+    "monitoring": {
+      "enable_defender_for_cloud": true,
+      "enable_activity_log_alerts": true,
+      "log_retention_days": 90
+    }
   },
   "subscriptions": [
     {
       "name": "Platform Services",
       "alias": "platform-services",
       "management_group_id": "mg-platform-dev",
-      "workload": "Development"
+      "workload": "Development",
+      "security_level": "Medium"
     },
     {
       "name": "Application Workloads",
       "alias": "app-workloads",
       "management_group_id": "mg-workloads-prod",
-      "workload": "Production"
+      "workload": "Production",
+      "security_level": "High"
     }
   ]
+}
 }

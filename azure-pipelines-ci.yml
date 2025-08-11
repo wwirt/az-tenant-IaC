@@ -48,6 +48,133 @@ stages:
           }
           Write-Host "All JSON files are valid"
 
+    - task: PowerShell@2
+      displayName: 'CIS Azure Benchmark Validation'
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "Performing CIS Azure Benchmark validation..."
+          
+          # Check if configuration files exist
+          $tenantConfigPath = "$(configDirectory)/tenant-config.json"
+          $mgConfigPath = "$(configDirectory)/management-groups.json"
+          
+          if (-not (Test-Path $tenantConfigPath)) {
+              Write-Error "Tenant configuration file not found at: $tenantConfigPath"
+              exit 1
+          }
+          
+          if (-not (Test-Path $mgConfigPath)) {
+              Write-Error "Management groups configuration file not found at: $mgConfigPath"
+              exit 1
+          }
+          
+          # Load tenant configuration
+          try {
+              $tenantConfig = Get-Content $tenantConfigPath -Raw | ConvertFrom-Json
+              Write-Host "✓ Successfully loaded tenant configuration"
+          }
+          catch {
+              Write-Error "Failed to parse tenant-config.json: $($_.Exception.Message)"
+              exit 1
+          }
+          
+          try {
+              $mgConfig = Get-Content $mgConfigPath -Raw | ConvertFrom-Json
+              Write-Host "✓ Successfully loaded management groups configuration"
+          }
+          catch {
+              Write-Error "Failed to parse management-groups.json: $($_.Exception.Message)"
+              exit 1
+          }
+          
+          # CIS compliance validation checks
+          $cisIssues = @()
+          
+          # Validate security_policies structure exists
+          if (-not $tenantConfig.PSObject.Properties['security_policies']) {
+              $cisIssues += "Missing security_policies configuration section"
+          } else {
+              # CIS 1.1 - Ensure MFA is enabled for all users
+              if (-not $tenantConfig.security_policies.PSObject.Properties['cis_controls'] -or 
+                  -not $tenantConfig.security_policies.cis_controls.PSObject.Properties['require_mfa_for_all_users'] -or 
+                  -not $tenantConfig.security_policies.cis_controls.require_mfa_for_all_users) {
+                  $cisIssues += "CIS 1.1: MFA must be enabled for all users"
+              }
+              
+              # CIS 1.2 - Block legacy authentication
+              if (-not $tenantConfig.security_policies.cis_controls.PSObject.Properties['block_legacy_authentication'] -or 
+                  -not $tenantConfig.security_policies.cis_controls.block_legacy_authentication) {
+                  $cisIssues += "CIS 1.2: Legacy authentication must be blocked"
+              }
+              
+              # CIS 1.3 - Password policies
+              if (-not $tenantConfig.security_policies.cis_controls.PSObject.Properties['minimum_password_length'] -or 
+                  $tenantConfig.security_policies.cis_controls.minimum_password_length -lt 14) {
+                  $cisIssues += "CIS 1.3: Minimum password length must be at least 14 characters"
+              }
+              
+              # CIS 2.1 - Defender for Cloud Standard tier
+              if (-not $tenantConfig.security_policies.PSObject.Properties['monitoring'] -or
+                  -not $tenantConfig.security_policies.monitoring.PSObject.Properties['enable_defender_for_cloud'] -or 
+                  -not $tenantConfig.security_policies.monitoring.enable_defender_for_cloud) {
+                  $cisIssues += "CIS 2.1: Defender for Cloud must be enabled"
+              }
+              
+              # CIS 3.1 - Storage account secure transfer
+              if (-not $tenantConfig.security_policies.PSObject.Properties['azure_policies'] -or
+                  -not $tenantConfig.security_policies.azure_policies.PSObject.Properties['require_https_traffic_only'] -or 
+                  -not $tenantConfig.security_policies.azure_policies.require_https_traffic_only) {
+                  $cisIssues += "CIS 3.1: HTTPS traffic only must be required for storage accounts"
+              }
+              
+              # CIS 3.2 - Storage account public access
+              if (-not $tenantConfig.security_policies.azure_policies.PSObject.Properties['deny_public_storage_accounts'] -or 
+                  -not $tenantConfig.security_policies.azure_policies.deny_public_storage_accounts) {
+                  $cisIssues += "CIS 3.2: Public access to storage accounts must be denied"
+              }
+              
+              # CIS 6.1 - Network security groups
+              if (-not $tenantConfig.security_policies.azure_policies.PSObject.Properties['deny_rdp_from_internet'] -or 
+                  -not $tenantConfig.security_policies.azure_policies.deny_rdp_from_internet) {
+                  $cisIssues += "CIS 6.1: RDP access from internet must be blocked"
+              }
+              
+              if (-not $tenantConfig.security_policies.azure_policies.PSObject.Properties['deny_ssh_from_internet'] -or 
+                  -not $tenantConfig.security_policies.azure_policies.deny_ssh_from_internet) {
+                  $cisIssues += "CIS 6.2: SSH access from internet must be blocked"
+              }
+          }
+          
+          # Check for essential management groups
+          $requiredMGs = @("mg-security", "mg-quarantine")
+          foreach ($mgName in $requiredMGs) {
+              $mg = $mgConfig.management_groups | Where-Object { $_.name -eq $mgName }
+              if (-not $mg) {
+                  $cisIssues += "Missing critical management group for security isolation: $mgName"
+              }
+          }
+          
+          # Validate subscription references
+          if ($tenantConfig.PSObject.Properties['subscriptions']) {
+              foreach ($subscription in $tenantConfig.subscriptions) {
+                  $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
+                  if (-not $mgExists) {
+                      $cisIssues += "Subscription '$($subscription.name)' references non-existent management group: $($subscription.management_group_id)"
+                  }
+              }
+          }
+          
+          if ($cisIssues.Count -gt 0) {
+              Write-Host "CIS compliance validation failed with $($cisIssues.Count) issues:"
+              foreach ($issue in $cisIssues) {
+                  Write-Error "⚠️  $issue"
+              }
+              exit 1
+          } else {
+              Write-Host "✅ All CIS Azure Benchmark validation checks passed ($($cisIssues.Count) issues found)"
+          }
+
   - job: TerraformValidate
     displayName: 'Terraform Validate & Plan'
     pool:
@@ -84,4 +211,4 @@ stages:
         command: 'plan'
         workingDirectory: $(workingDirectory)
         environmentServiceNameAzureRM: $(tenantServiceConnection)
-        commandOptions: '-var-file="../config/prod-config.json" -var="environment=prod" -var="management_groups_file=../config/management-groups.json" -out=tfplan'
+        commandOptions: '-var="environment=prod" -var="management_groups_file=../config/management-groups.json" -var="tenant_config_file=../config/tenant-config.json" -out=tfplan'

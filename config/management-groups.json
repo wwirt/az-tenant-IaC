@@ -10,6 +10,11 @@
       "parent_id": null
     },
     {
+      "name": "mg-security",
+      "display_name": "Security Management Group",
+      "parent_id": "mg-root"
+    },
+    {
       "name": "mg-platform",
       "display_name": "Platform Management Group",
       "parent_id": "mg-root"
@@ -17,6 +22,16 @@
     {
       "name": "mg-workloads",
       "display_name": "Workloads Management Group",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-sandbox",
+      "display_name": "Sandbox Management Group",
+      "parent_id": "mg-root"
+    },
+    {
+      "name": "mg-quarantine",
+      "display_name": "Quarantine Management Group",
       "parent_id": "mg-root"
     },
     {

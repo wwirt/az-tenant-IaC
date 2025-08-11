@@ -1,8 +1,12 @@
 # Load tenant configuration from JSON file
 locals {
-  # Load the environment-specific configuration
-  config_file_path = var.config_file_path != "" ? var.config_file_path : "../config/${var.environment}-config.json"
-  tenant_config_raw = fileexists(local.config_file_path) ? file(local.config_file_path) : "{}"
+  # Load the tenant configuration (prioritize explicit path, then environment-specific, then fallback)
+  tenant_config_path = var.tenant_config_file != "" ? var.tenant_config_file : 
+                      fileexists("../config/tenant-config.json") ? "../config/tenant-config.json" :
+                      fileexists("../config/${var.environment}-config.json") ? "../config/${var.environment}-config.json" : ""
+  
+  tenant_config_raw = local.tenant_config_path != "" && fileexists(local.tenant_config_path) ? 
+                     file(local.tenant_config_path) : "{}"
   tenant_config = jsondecode(local.tenant_config_raw)
   
   # Load the shared management groups structure
@@ -28,6 +32,7 @@ locals {
       domain_name = var.tenant_domain_name
     }
     subscriptions = []
+    security_policies = {}
   }
   
   # Merge with additional variables and defaults
@@ -35,6 +40,7 @@ locals {
     tenant = lookup(local.tenant_config, "tenant", local.default_tenant.tenant)
     management_groups = local.combined_management_groups
     subscriptions = lookup(local.tenant_config, "subscriptions", local.default_tenant.subscriptions)
+    security_policies = lookup(local.tenant_config, "security_policies", local.default_tenant.security_policies)
   }
   
   # Common tags for all resources
@@ -44,5 +50,6 @@ locals {
     TerraformManaged = "true"
     TerraformWorkspace = terraform.workspace
     DeploymentVersion = var.deployment_version
+    TenantId = data.azurerm_client_config.current.tenant_id
   })
 }

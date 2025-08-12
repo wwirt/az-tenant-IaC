@@ -35,11 +35,20 @@ locals {
     security_policies = {}
   }
   
+  # Validate security levels for subscriptions
+  validated_subscriptions = [
+    for sub in lookup(local.tenant_config, "subscriptions", local.default_tenant.subscriptions) : merge(sub, {
+      security_level = lookup(sub, "security_level", "L1")
+      # Ensure security level is valid
+      _security_level_valid = contains(["L1", "L2"], lookup(sub, "security_level", "L1"))
+    })
+  ]
+  
   # Merge with additional variables and defaults
   merged_config = {
     tenant = lookup(local.tenant_config, "tenant", local.default_tenant.tenant)
     management_groups = local.combined_management_groups
-    subscriptions = lookup(local.tenant_config, "subscriptions", local.default_tenant.subscriptions)
+    subscriptions = local.validated_subscriptions
     security_policies = lookup(local.tenant_config, "security_policies", local.default_tenant.security_policies)
   }
   

@@ -162,6 +162,21 @@ stages:
                   if (-not $mgExists) {
                       $cisIssues += "Subscription '$($subscription.name)' references non-existent management group: $($subscription.management_group_id)"
                   }
+                  
+                  # Validate security level
+                  if ($subscription.PSObject.Properties['security_level']) {
+                      $validSecurityLevels = @("L1", "L2")
+                      if ($subscription.security_level -notin $validSecurityLevels) {
+                          $cisIssues += "Subscription '$($subscription.name)' has invalid security level '$($subscription.security_level)'. Must be L1 or L2."
+                      }
+                      
+                      # Production workloads should have L2 security level
+                      if ($subscription.workload -eq "Production" -and $subscription.security_level -ne "L2") {
+                          $cisIssues += "Production subscription '$($subscription.name)' should have L2 security level for enhanced protection."
+                      }
+                  } else {
+                      $cisIssues += "Subscription '$($subscription.name)' is missing security_level property."
+                  }
               }
           }
           
@@ -172,7 +187,7 @@ stages:
               }
               exit 1
           } else {
-              Write-Host "✅ All CIS Azure Benchmark validation checks passed ($($cisIssues.Count) issues found)"
+              Write-Host "✅ All CIS Azure Benchmark validation checks passed (0 issues found)"
           }
 
   - job: TerraformValidate

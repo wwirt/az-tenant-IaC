@@ -38,14 +38,14 @@
       "alias": "platform-services",
       "management_group_id": "mg-platform-dev",
       "workload": "Development",
-      "security_level": "Medium"
+      "security_level": "L1"
     },
     {
       "name": "Application Workloads",
       "alias": "app-workloads",
       "management_group_id": "mg-workloads-prod",
       "workload": "Production",
-      "security_level": "High"
+      "security_level": "L2"
     }
   ]
 }

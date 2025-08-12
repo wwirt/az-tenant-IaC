@@ -60,10 +60,23 @@ variable "tags" {
     CreatedBy     = "Azure-DevOps"
     CostCenter    = "IT-Cloud"
   }
+  
+  validation {
+    condition = alltrue([
+      for k, v in var.tags : can(regex("^[a-zA-Z0-9._-]+$", k)) && can(regex("^[a-zA-Z0-9._-]+$", v))
+    ])
+    error_message = "Tag keys and values must contain only alphanumeric characters, periods, underscores, and hyphens."
+  }
 }
 
 variable "tenant_config_file" {
   description = "Path to the tenant configuration JSON file"
   type        = string
   default     = ""
+}
+
+variable "security_level_validation" {
+  description = "Enable validation of security levels in configuration"
+  type        = bool
+  default     = true
 }

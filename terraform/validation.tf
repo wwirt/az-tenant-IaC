@@ -22,69 +22,69 @@ terraform {
 resource "null_resource" "validate_tenant_config" {
   provisioner "local-exec" {
     command = <<-EOT
-      #!/bin/bash
-      set -e
-      
-      # Ensure required values exist in tenant config
-      if [ -z "${local.merged_config.tenant.display_name}" ]; then
-        echo "ERROR: Tenant display_name is required in configuration"
-        exit 1
-      fi
-      
+      # PowerShell script to validate tenant configuration
+      Write-Host "Validating tenant configuration..."
+
+      # Load configuration from local.merged_config
+      $config = ConvertFrom-Json '${jsonencode(local.merged_config)}'
+
+      # Validate tenant display name
+      if (-not $config.tenant.display_name) {
+          Write-Error "Tenant display_name is required in configuration"
+          exit 1
+      }
+
       # Validate management group hierarchy for circular dependencies
-      python -c '
-import json
-import sys
+      $mg_dict = @{}
+      foreach ($mg in $config.management_groups) {
+          $mg_dict[$mg.name] = $mg
+      }
 
-config = json.loads("""${jsonencode(local.merged_config)}""")
-mg_dict = {mg["name"]: mg for mg in config["management_groups"]}
+      # Check for circular dependencies
+      function Has-Cycle {
+          param (
+              [string]$node_name,
+              [System.Collections.ArrayList]$path = $([System.Collections.ArrayList]::new())
+          )
+          
+          if ($path -contains $node_name) {
+              Write-Error "Circular dependency detected in management group hierarchy: $($path + $node_name)"
+              return $true
+          }
+          
+          if (-not $mg_dict.ContainsKey($node_name)) {
+              return $false
+          }
+          
+          $parent_id = $mg_dict[$node_name].parent_id
+          if (-not $parent_id) {
+              return $false
+          }
+          
+          $path.Add($node_name)
+          $cycle = Has-Cycle -node_name $parent_id -path $path
+          $path.RemoveAt($path.Count - 1)
+          
+          return $cycle
+      }
 
-# Check for circular dependencies
-visited = set()
-temp_path = set()
+      foreach ($mg in $config.management_groups) {
+          if (Has-Cycle -node_name $mg.name) {
+              exit 1
+          }
+      }
 
-def has_cycle(node_name, path=None):
-    if path is None:
-        path = []
-    
-    if node_name in temp_path:
-        print(f"ERROR: Circular dependency detected in management group hierarchy: {path + [node_name]}")
-        return True
-    
-    if node_name in visited:
-        return False
-    
-    if node_name not in mg_dict:
-        return False
-    
-    parent_id = mg_dict[node_name].get("parent_id")
-    if not parent_id:
-        return False
-    
-    temp_path.add(node_name)
-    path.append(node_name)
-    has_cycle_result = has_cycle(parent_id, path)
-    temp_path.remove(node_name)
-    
-    if not has_cycle_result:
-        visited.add(node_name)
-    
-    return has_cycle_result
+      # Validate subscription references to management groups
+      foreach ($sub in $config.subscriptions) {
+          if (-not $mg_dict.ContainsKey($sub.management_group_id)) {
+              Write-Error "Subscription $($sub.name) references non-existent management group $($sub.management_group_id)"
+              exit 1
+          }
+      }
 
-for mg in config["management_groups"]:
-    if has_cycle(mg["name"]):
-        sys.exit(1)
-
-# Validate subscription references to management groups
-for sub in config["subscriptions"]:
-    if sub["management_group_id"] not in mg_dict:
-        print(f"ERROR: Subscription {sub['name']} references non-existent management group {sub['management_group_id']}")
-        sys.exit(1)
-'
-      
-      echo "✓ Tenant configuration validation successful"
+      Write-Host "✓ Tenant configuration validation successful"
+      exit 0
     EOT
-    
-    interpreter = ["bash", "-c"]
+    interpreter = ["pwsh", "-Command"]
   }
 }

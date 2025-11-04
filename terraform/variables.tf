@@ -4,6 +4,12 @@ variable "config_file_path" {
   default     = ""
 }
 
+variable "tenant_config_file" {
+  description = "Path to the tenant JSON configuration file"
+  type        = string
+  default     = ""
+}
+
 variable "management_groups_file" {
   description = "Path to the management groups JSON configuration file"
   type        = string

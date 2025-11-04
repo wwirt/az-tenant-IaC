@@ -8,13 +8,22 @@
       "name": "Platform Services",
       "alias": "platform-services",
       "management_group_id": "mg-platform-dev",
-      "workload": "Development"
+      "workload": "Development",
+      "environment": "dev"
     },
     {
       "name": "Application Workloads",
       "alias": "app-workloads",
+      "management_group_id": "mg-workloads-dev",
+      "workload": "Development",
+      "environment": "dev"
+    },
+    {
+      "name": "Production Workloads",
+      "alias": "prod-workloads",
       "management_group_id": "mg-workloads-prod",
-      "workload": "Production"
+      "workload": "Production",
+      "environment": "prod"
     }
   ]
 }

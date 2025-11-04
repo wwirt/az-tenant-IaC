@@ -1,9 +1,0 @@
-{
-  "management_groups": [
-    {
-      "name": "mg-workloads-prod",
-      "display_name": "Workloads - Production",
-      "parent_id": "mg-root"
-    }
-  ]
-}

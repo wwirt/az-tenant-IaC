@@ -45,11 +45,14 @@ stages:
                 $mgConfig = Get-Content "$(configDirectory)/management-groups.json" | ConvertFrom-Json
                 $tenantConfig = Get-Content "$(configDirectory)/tenant-config.json" | ConvertFrom-Json
                 
-                # Validate management groups referenced in tenant config exist
+                # Validate management groups referenced in tenant config exist for the 'dev' environment
                 foreach ($subscription in $tenantConfig.subscriptions) {
-                  $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
-                  if (-not $mgExists) {
-                    Write-Warning "Management group '$($subscription.management_group_id)' referenced in subscription '$($subscription.name)' not found in management-groups.json"
+                  if ($subscription.environment -eq "dev") {
+                    $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
+                    if (-not $mgExists) {
+                      Write-Error "Management group '$($subscription.management_group_id)' referenced in subscription '$($subscription.name)' not found in management-groups.json"
+                      exit 1
+                    }
                   }
                 }
                 Write-Host "Management group validation completed"
@@ -78,7 +81,7 @@ stages:
               command: 'plan'
               workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(tenantServiceConnection)
-              commandOptions: '-var="environment=dev" -var="tenant_config_file=../config/tenant-config.json" -out=tfplan'
+              commandOptions: '-var="environment=dev" -var="tenant_config_file=../config/tenant-config.json" -var="management_groups_file=../config/management-groups.json" -out=tfplan'
           
           - task: TerraformTaskV4@4
             displayName: 'Terraform Apply'
@@ -113,12 +116,14 @@ stages:
                 $mgConfig = Get-Content "$(configDirectory)/management-groups.json" | ConvertFrom-Json
                 $tenantConfig = Get-Content "$(configDirectory)/tenant-config.json" | ConvertFrom-Json
                 
-                # Validate management groups referenced in tenant config exist
+                # Validate management groups referenced in tenant config exist for the 'prod' environment
                 foreach ($subscription in $tenantConfig.subscriptions) {
-                  $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
-                  if (-not $mgExists) {
-                    Write-Error "Management group '$($subscription.management_group_id)' referenced in subscription '$($subscription.name)' not found in management-groups.json"
-                    exit 1
+                  if ($subscription.environment -eq "prod") {
+                    $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
+                    if (-not $mgExists) {
+                      Write-Error "Management group '$($subscription.management_group_id)' referenced in subscription '$($subscription.name)' not found in management-groups.json"
+                      exit 1
+                    }
                   }
                 }
                 
@@ -158,7 +163,7 @@ stages:
               command: 'plan'
               workingDirectory: $(workingDirectory)
               environmentServiceNameAzureRM: $(tenantServiceConnection)
-              commandOptions: '-var="environment=prod" -var="tenant_config_file=../config/tenant-config.json" -out=tfplan'
+              commandOptions: '-var="environment=prod" -var="tenant_config_file=../config/tenant-config.json" -var="management_groups_file=../config/management-groups.json" -out=tfplan'
           
           - task: TerraformTaskV4@4
             displayName: 'Terraform Apply'

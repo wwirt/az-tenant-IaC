@@ -1,0 +1,82 @@
+# templates/deployment-job-template.yml
+parameters:
+- name: environment
+  type: string
+- name: displayName
+  type: string
+- name: terraformStateKey
+  type: string
+- name: environmentShort
+  type: string
+
+jobs:
+- deployment: Deploy_${{ parameters.environment }}
+  displayName: ${{ parameters.displayName }}
+  pool:
+    vmImage: 'ubuntu-latest'
+  environment: ${{ parameters.environment }}
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+        
+        - task: PowerShell@2
+          displayName: 'Validate Management Group and Subscription Structure'
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "Validating configuration for environment: ${{ parameters.environmentShort }}"
+              $mgConfig = Get-Content "$(configDirectory)/management-groups.json" | ConvertFrom-Json
+              $tenantConfig = Get-Content "$(configDirectory)/tenant-config.json" | ConvertFrom-Json
+              
+              # Validate that management groups referenced in subscriptions exist
+              $filteredSubscriptions = $tenantConfig.subscriptions | Where-Object { $_.environment -eq "${{ parameters.environmentShort }}" }
+              
+              if ($filteredSubscriptions.Count -eq 0) {
+                Write-Warning "No subscriptions found for environment '${{ parameters.environmentShort }}'. Skipping validation."
+              } else {
+                foreach ($subscription in $filteredSubscriptions) {
+                  $mgExists = $mgConfig.management_groups | Where-Object { $_.name -eq $subscription.management_group_id }
+                  if (-not $mgExists) {
+                    Write-Error "Management group '$($subscription.management_group_id)' referenced in subscription '$($subscription.name)' not found in management-groups.json"
+                    exit 1
+                  }
+                }
+              }
+              Write-Host "Validation completed successfully for environment: ${{ parameters.environmentShort }}"
+        
+        - task: TerraformInstaller@0
+          displayName: 'Install Terraform'
+          inputs:
+            terraformVersion: $(terraformVersion)
+        
+        - task: TerraformTaskV4@4
+          displayName: 'Terraform Init'
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: $(workingDirectory)
+            backendServiceArm: $(backendServiceConnection)
+            backendAzureRmResourceGroupName: '$(backendResourceGroup)'
+            backendAzureRmStorageAccountName: '$(backendStorageAccount)'
+            backendAzureRmContainerName: 'tfstate'
+            backendAzureRmKey: '${{ parameters.terraformStateKey }}'
+        
+        - task: TerraformTaskV4@4
+          displayName: 'Terraform Plan'
+          inputs:
+            provider: 'azurerm'
+            command: 'plan'
+            workingDirectory: $(workingDirectory)
+            environmentServiceNameAzureRM: $(tenantServiceConnection)
+            commandOptions: '-var="environment=${{ parameters.environmentShort }}" -var="tenant_config_file=../config/tenant-config.json" -var="management_groups_file=../config/management-groups.json" -out=tfplan'
+        
+        - task: TerraformTaskV4@4
+          displayName: 'Terraform Apply'
+          inputs:
+            provider: 'azurerm'
+            command: 'apply'
+            workingDirectory: $(workingDirectory)
+            environmentServiceNameAzureRM: $(tenantServiceConnection)
+            commandOptions: 'tfplan'

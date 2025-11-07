@@ -23,10 +23,7 @@ locals {
 
   # Common tags for all resources
   common_tags = merge(var.tags, {
-    Environment = var.environment
-    LastModified = formatdate("YYYY-MM-DD hh:mm:ss ZZZ", timestamp())
     TerraformManaged = "true"
     TerraformWorkspace = terraform.workspace
-    DeploymentVersion = var.deployment_version
   })
 }

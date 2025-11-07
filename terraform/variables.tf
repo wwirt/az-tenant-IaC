@@ -1,9 +1,3 @@
-variable "config_file_path" {
-  description = "Path to the environment-specific JSON configuration file"
-  type        = string
-  default     = ""
-}
-
 variable "tenant_config_file" {
   description = "Path to the tenant JSON configuration file"
   type        = string
@@ -29,12 +23,12 @@ variable "tenant_domain_name" {
 }
 
 variable "environment" {
-  description = "Environment name (dev, prod, etc.)"
+  description = "Environment name (test, dev, prod)"
   type        = string
   default     = "dev"
   validation {
-    condition     = contains(["dev", "test", "prod", "production", "development", "staging", "sandbox"], lower(var.environment))
-    error_message = "Environment must be one of: dev, test, prod, production, development, staging, sandbox."
+    condition     = contains(["dev", "test", "prod"], lower(var.environment))
+    error_message = "Environment must be one of: dev, test, prod"
   }
 }
 
@@ -60,10 +54,8 @@ variable "tags" {
   description = "Common tags for all resources"
   type        = map(string)
   default = {
-    Environment   = "dev"
     ManagedBy     = "Terraform"
     Project       = "Azure-Tenant-IaC"
     CreatedBy     = "Azure-DevOps"
-    CostCenter    = "IT-Cloud"
   }
 }

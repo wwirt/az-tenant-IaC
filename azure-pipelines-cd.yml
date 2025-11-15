@@ -9,7 +9,6 @@ resources:
         branches:
           include:
             - main
-            - develop
 
 variables:
   terraformVersion: '1.5.0'
@@ -23,7 +22,7 @@ variables:
 stages:
 - stage: Deploy_Dev
   displayName: 'Deploy to Development'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
   - template: templates/deployment-job-template.yml
     parameters:
@@ -34,7 +33,7 @@ stages:
 
 - stage: Deploy_Prod
   displayName: 'Deploy to Production'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  dependsOn: Deploy_Dev
   jobs:
   - template: templates/deployment-job-template.yml
     parameters:

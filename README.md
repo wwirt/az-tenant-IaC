@@ -1,193 +1,159 @@
 # Azure Tenant Infrastructure as Code (IaC)
-
-This project implements Azure DevOps CI/CD pipelines for deploying Azure tenant infrastructure using Terraform and JSON configuration files.
-
+Azure DevOps CI/CD pipeline for Azure tenant infrastructure including management groups and subscriptions using Terraform
 ## Overview
 
 This solution provides:
-- Azure DevOps CI/CD pipeline for automated deployment
-- Terraform infrastructure as code for Azure tenant, management groups, and subscriptions
-- JSON-based configuration for different environments
-- Validation and deployment stages
-- Support for multiple environments (dev, prod)
+- Azure DevOps CI/CD pipelines for automated validation and deployment of management groups, subscriptions, and diagnostic settings
+- Centralized JSON configuration for Azure tenant management
+- Terraform IaC for management groups, subscriptions, associations, diagnostic settings
+- Environment scoping via an `environment` field on subscriptions
 
 ## Project Structure
 
 ```
 .
-├── azure-pipelines.yml          # Azure DevOps CI/CD pipeline
-├── config/                      # JSON configuration files
-│   ├── dev-config.json         # Development environment config
-│   ├── prod-config.json        # Production environment config
-│   └── tenant-config.json      # Base tenant configuration
-├── terraform/                   # Terraform infrastructure code
-│   ├── main.tf                 # Provider configuration
-│   ├── variables.tf            # Variable definitions
-│   ├── locals.tf               # Local values and JSON processing
-│   ├── tenant.tf               # Main tenant infrastructure
-│   └── outputs.tf              # Output definitions
-└── README.md                   # This file
+├── azure-pipelines-ci.yml          # CI pipeline: JSON validation + terraform validate/plan (prod plan by default)
+├── azure-pipelines-cd.yml          # CD pipeline: template-based dev & prod deployments
+├── templates/
+│   └── deployment-job-template.yml # Reusable deployment job (validation + init/plan/apply)
+├── config/
+│   ├── tenant-config.json          # Central tenant + all subscriptions (with environment property)
+│   ├── management-groups.json      # Full management group hierarchy
+│   └── tenant-template.json        # Example starter template for new tenants
+├── terraform/
+│   ├── main.tf                     # Provider & backend stub
+│   ├── variables.tf                # Input variables (tenant_config_file, management_groups_file, environment, etc.)
+│   ├── locals.tf                   # Load & filter JSON (subscriptions filtered by environment)
+│   ├── tenant.tf                   # Management groups, subscriptions, associations
+│   ├── diagnostics.tf              # Optional diagnostic settings
+│   ├── outputs.tf                  # Output definitions
+│   └── terraform.tfvars.example    # Example variable values
+└── README.md
 ```
 
-## Prerequisites
+## Configuration Model
 
-### Azure Setup
+Centralized configuration removes duplication:
+- `tenant-config.json`: Contains `tenant` object and a unified `subscriptions` array. Each subscription includes an `environment` key (`dev`, `prod`, etc.) used for filtering.
+- `management-groups.json`: Contains a `management_groups` array defining the hierarchy (each has `name`, `display_name`, `parent_id`).
+- No separate `dev-config.json` or `prod-config.json` files.
 
-1. **Azure Subscription**: You need an Azure subscription with appropriate permissions
-2. **Service Principal**: Create a service principal with the following permissions:
-   - `Owner` or `Contributor` at the tenant level
-   - `Application Administrator` in Azure AD
-   - `Directory Writers` in Azure AD
+Terraform loads both files via variables: `tenant_config_file` and `management_groups_file`. In `locals.tf`, subscriptions are filtered:
+```
+filtered_subscriptions = [for sub in local.tenant_config.subscriptions : sub if sub.environment == var.environment]
+```
+This ensures each deployment affects only its environment scope.
 
-3. **Storage Account**: Create a storage account for Terraform state:
-   ```bash
-   az group create --name terraform-state-rg --location "East US"
-   az storage account create --resource-group terraform-state-rg --name terraformstatestore001 --sku Standard_LRS --encryption-services blob
-   az storage container create --name tfstate --account-name terraformstatestore001
-   ```
+## Pipelines
 
-### Azure DevOps Setup
+### CI (`azure-pipelines-ci.yml`)
+Steps:
+1. JSON validation (syntax check of all config *.json files)
+2. Terraform init/validate
+3. Terraform plan (uses `tenant-config.json` + `management-groups.json` and sets `environment=prod` for consistency)
 
-1. **Project**: Create an Azure DevOps project
-2. **Service Connection**: 
-   - Go to Project Settings > Service connections
-   - Create a new Azure Resource Manager service connection
-   - Use the service principal created above
-   - Name it `azure-service-connection` (or update the pipeline variable)
+### CD (`azure-pipelines-cd.yml`)
+Stages:
+- `Deploy_Dev`
+- `Deploy_Prod`
 
-3. **Environments**: Create environments in Azure DevOps:
-   - `development`
-   - `production`
+Both stages call the template: `templates/deployment-job-template.yml` with parameters:
+- `terraformStateKey` (separate state per environment)
+- `environmentShort` (passed to Terraform `-var="environment=..."`)
 
-4. **Variable Groups** (Optional): Create variable groups for sensitive information
+Template actions:
+1. Validate referenced management groups for environment-scoped subscriptions
+2. Terraform install
+3. Terraform init (distinct backend key per env)
+4. Terraform plan (central config + environment filter)
+5. Terraform apply
 
-## Configuration
+## Local Usage
 
-### Update Pipeline Variables
+From the `terraform/` directory:
+```pwsh
+terraform init
+terraform plan -var="environment=dev" -var="tenant_config_file=../config/tenant-config.json" -var="management_groups_file=../config/management-groups.json"
+terraform apply -var="environment=dev" -var="tenant_config_file=../config/tenant-config.json" -var="management_groups_file=../config/management-groups.json"
 
-Edit `azure-pipelines.yml` and update:
-- `azureServiceConnection`: Name of your Azure service connection
-- `backendAzureRmStorageAccountName`: Your Terraform state storage account name
-- `backendAzureRmResourceGroupName`: Resource group containing the storage account
+# Production example
+terraform plan -var="environment=prod" -var="tenant_config_file=../config/tenant-config.json" -var="management_groups_file=../config/management-groups.json"
+```
 
-### JSON Configuration Files
+You can optionally supply `-var="deployment_version=1.1.0"` or override tags via `-var='tags={ Project = "Azure-Tenant-IaC" Environment = "prod" }'`.
 
-The JSON configuration files in the `config/` directory define your tenant structure:
+## Adding a New Environment
 
-#### Structure:
-```json
+1. Add subscriptions to `tenant-config.json` with a new `environment` value (e.g., `staging`).
+2. Add any required management groups to `management-groups.json` referencing parents.
+3. Create a new stage in `azure-pipelines-cd.yml` reusing the template with a distinct `terraformStateKey`.
+4. Run CI then merge branch corresponding to the new environment trigger convention.
+
+## Management Group Hierarchy
+
+Each management group entry:
+```
 {
-  "tenant": {
-    "display_name": "Your Tenant Name",
-    "domain_name": "yourdomain.onmicrosoft.com"
-  },
-  "management_groups": [
-    {
-      "name": "mg-root",
-      "display_name": "Root Management Group",
-      "parent_id": null
-    }
-  ],
-  "subscriptions": [
-    {
-      "name": "Subscription Name",
-      "alias": "subscription-alias",
-      "management_group_id": "mg-root",
-      "workload": "Production"
-    }
-  ]
+  "name": "mg-platform-dev",
+  "display_name": "Platform Development",
+  "parent_id": "mg-platform"
+}
+```
+Root groups use `parent_id: null`.
+
+## Key Terraform Locals
+
+- `tenant_config` / `management_groups_config`: Raw decoded JSON
+- `filtered_subscriptions`: Environment-scoped subscription list
+- `merged_config`: Aggregated structure consumed by resources
+
+## Outputs
+
+Important outputs include:
+- `management_groups` map of created groups
+- `subscriptions` map with alias/name/workload
+- `subscription_management_group_associations`
+- `deployment_information` (timestamp, version, environment)
+
+## Example Subscription Entry
+
+```
+{
+  "name": "Production Workloads",
+  "alias": "prod-workloads",
+  "management_group_id": "mg-workloads-prod",
+  "workload": "Production",
+  "environment": "prod"
 }
 ```
 
-## Deployment
-
-### Automatic Deployment
-
-The pipeline automatically triggers on:
-- Push to `main` branch → Production deployment
-- Push to `develop` branch → Development deployment
-
-### Manual Deployment
-
-1. **Local Development**:
-   ```bash
-   cd terraform
-   terraform init
-   terraform plan -var-file="../config/dev-config.json"
-   terraform apply -var-file="../config/dev-config.json"
-   ```
-
-2. **Environment-specific deployment**:
-   ```bash
-   # Development
-   terraform apply -var-file="../config/dev-config.json" -var="environment=dev"
-   
-   # Production
-   terraform apply -var-file="../config/prod-config.json" -var="environment=prod"
-   ```
-
-## Pipeline Stages
-
-### 1. Validate
-- **ValidateConfig**: Validates JSON configuration files
-- **TerraformValidate**: Runs `terraform validate` and `terraform plan`
-
-### 2. Deploy_Dev
-- Deploys to development environment
-- Triggered on `develop` branch
-- Uses `dev-config.json`
-
-### 3. Deploy_Prod
-- Deploys to production environment
-- Triggered on `main` branch
-- Uses `prod-config.json`
-
-## Security Considerations
-
-1. **Service Principal Permissions**: Use least privilege principle
-2. **State File Security**: Terraform state is stored in Azure Storage with encryption
-3. **Secrets Management**: Use Azure Key Vault for sensitive information
-4. **Environment Separation**: Different state files for different environments
-
-## Customization
-
-### Adding New Environments
-
-1. Create a new JSON config file in `config/` directory
-2. Add a new stage in `azure-pipelines.yml`
-3. Create the environment in Azure DevOps
-
-### Modifying Infrastructure
-
-1. Update the JSON configuration files for your requirements
-2. Modify Terraform code in the `terraform/` directory if needed
-3. Test changes in development environment first
-
 ## Troubleshooting
 
-### Common Issues
-
-1. **Permission Errors**: Ensure service principal has sufficient permissions
-2. **State Lock**: If deployment fails, check for state locks in Azure Storage
-3. **Resource Conflicts**: Ensure resource names are unique across Azure
-
-### Debugging
-
-- Check Azure DevOps pipeline logs
-- Review Terraform plan output
-- Validate JSON configuration files locally
+- Missing management group: ensure `management_groups.json` has the referenced `name`.
+- Empty plan: Verify the `environment` value matches subscription entries.
+- Backend lock: Check Azure Storage `tfstate` container for locks.
 
 ## Best Practices
 
-1. **Version Control**: Always commit changes through Git
-2. **Testing**: Test in development before promoting to production
-3. **Documentation**: Keep configuration files well-documented
-4. **Monitoring**: Set up monitoring and alerting for infrastructure changes
+- Keep environment logic ONLY in `tenant-config.json` via `environment` field.
+- Avoid duplicating subscription definitions.
+- Use separate state keys per environment.
+- Review plan output in CI before deploying.
 
 ## Contributing
 
-1. Create a feature branch from `develop`
-2. Make your changes
-3. Test in development environment
-4. Create a pull request to `develop`
-5. After approval, merge to `main` for production deployment
+1. Branch from `develop`
+2. Update JSON / Terraform
+3. Run local plan
+4. Push → CI validate
+5. Open PR to `develop`
+6. Merge to `main` for production
+
+## Deprecated
+
+The following are no longer used and have been removed:
+- `dev-config.json`
+- `prod-config.json`
+- Per-environment management group JSON files
+
+Centralization reduces drift and improves auditability.

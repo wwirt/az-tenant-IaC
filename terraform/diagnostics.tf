@@ -28,7 +28,7 @@ resource "azurerm_monitor_diagnostic_setting" "subscription_diagnostics" {
 
     retention_policy {
       enabled = true
-      days    = 30
+      days    = 90
     }
   }
 
@@ -38,7 +38,7 @@ resource "azurerm_monitor_diagnostic_setting" "subscription_diagnostics" {
 
     retention_policy {
       enabled = true
-      days    = 30
+      days    = 90
     }
   }
 
@@ -88,7 +88,7 @@ resource "azurerm_monitor_diagnostic_setting" "subscription_diagnostics" {
 
     retention_policy {
       enabled = true
-      days    = 30
+      days    = 15
     }
   }
 
@@ -98,7 +98,7 @@ resource "azurerm_monitor_diagnostic_setting" "subscription_diagnostics" {
 
     retention_policy {
       enabled = true
-      days    = 30
+      days    = 15
     }
   }
 
@@ -108,7 +108,7 @@ resource "azurerm_monitor_diagnostic_setting" "subscription_diagnostics" {
 
     retention_policy {
       enabled = true
-      days    = 30
+      days    = 15
     }
   }
   

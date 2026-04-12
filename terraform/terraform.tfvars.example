@@ -7,8 +7,8 @@ environment = "dev"
 # Azure region for resources
 location = "East US"
 
-# Path to JSON configuration file (relative to terraform directory)
-config_file_path = "../config/dev-config.json"
+# Path to YAML configuration file (relative to terraform directory)
+config_file = "../config/tenant.yml"
 
 # Common tags for all resources
 tags = {

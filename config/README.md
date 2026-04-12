@@ -1,49 +1,30 @@
-# Management Group Structure
+# Tenant Configuration
 
-This directory contains the JSON configuration files that define the Azure tenant structure, management groups and subscriptions.
+This directory contains the YAML configuration file that defines the Azure tenant structure, management groups, and subscriptions.
 
-## Management Group Hierarchy
+## Structure
 
-The management group hierarchy is structured as follows:
-- `mg-root` (Root Management Group) - Defined in management-groups.json
-  - `mg-platform-dev` (Platform - Development) - Defined in management-groups-dev.json
-  - `mg-workloads-dev` (Workloads - Development) - Defined in management-groups-dev.json
-  - `mg-workloads-prod` (Workloads - Production) - Defined in management-groups-prod.json
+The `tenant.yml` file is the single source of truth for the tenant configuration. It has three main sections:
 
-## File Structure
-
-The configuration is split into multiple files to provide a single source of truth for management group hierarchy while allowing environment-specific subscription configurations:
-
-### Base Management Group Structure
-- `management-groups.json` - The primary management group hierarchy that applies across all environments (includes `mg-root`)
-- `management-groups-dev.json` - Additional development-specific management groups
-- `management-groups-prod.json` - Additional production-specific management groups
-
-### Environment-Specific Configurations
-- `dev-config.json` - Development tenant settings and subscriptions
-- `prod-config.json` - Production tenant settings and subscriptions
+- `tenant`: Defines the tenant's display name and domain.
+- `management_groups`: A list of all management groups in the hierarchy. Each management group has a `name`, `display_name`, and `parent_id`. The root management group's `parent_id` should be `null`.
+- `subscriptions`: A list of all subscriptions, including their `name`, `alias`, `management_group_id`, `workload`, and `environment`.
 
 ## Usage
 
-The Terraform configuration will automatically:
-1. Load the base management groups from `management-groups.json`
-2. Load any environment-specific management groups if present
-3. Combine these with the environment-specific subscription configuration
+The Terraform configuration will automatically load the `tenant.yml` file and provision the resources accordingly. You can filter which subscriptions are deployed by setting the `environment` variable in your Terraform command or `.tfvars` file.
 
 ## Example Command
 
 ```bash
-terraform apply \
-  -var-file="../config/prod-config.json" \
-  -var="environment=prod" \
-  -var="management_groups_file=../config/management-groups.json"
+terraform apply -var="environment=prod"
 ```
 
 ## Benefits
 
-This structure provides:
-- A single source of truth for management group hierarchy
-- Consistent structure across environments
-- Environment-specific overrides when needed
-- Separation of structure (management groups) from resources (subscriptions)
-- Clear definition of the root management group (`mg-root`) in the base configuration file
+This centralized structure provides:
+- A single source of truth for the entire tenant configuration.
+- A clear and consistent structure.
+- Simplified management and maintenance.
+- Reduced risk of configuration drift and errors.
+- Environment-specific deployments from a single configuration file.

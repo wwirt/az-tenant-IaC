@@ -1,13 +1,7 @@
-variable "tenant_config_file" {
-  description = "Path to the tenant JSON configuration file"
+variable "config_file" {
+  description = "Path to the tenant YAML configuration file"
   type        = string
-  default     = ""
-}
-
-variable "management_groups_file" {
-  description = "Path to the management groups JSON configuration file"
-  type        = string
-  default     = ""
+  default     = "../config/tenant.yml"
 }
 
 variable "tenant_display_name" {
